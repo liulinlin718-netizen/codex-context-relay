@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Context Relay model proposal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["answer", "suggestions", "conflicts"],
+  "properties": {
+    "answer": {"type": "string"},
+    "suggestions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["text", "sourceExcerptIds"],
+        "properties": {"text": {"type": "string"}, "sourceExcerptIds": {"type": "array", "items": {"type": "string"}}}
+      }
+    },
+    "conflicts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["text", "sourceExcerptIds"],
+        "properties": {"text": {"type": "string"}, "sourceExcerptIds": {"type": "array", "items": {"type": "string"}}}
+      }
+    }
+  }
+}

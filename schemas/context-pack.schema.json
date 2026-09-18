@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:codex-context-relay:context-pack:1",
+  "title": "ContextPack v1 — project protocol, not an OpenAI native format",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "packId", "createdAt", "excerpts", "memory", "question"],
+  "properties": {
+    "schemaVersion": {"const": "1"},
+    "packId": {"type": "string", "minLength": 1, "maxLength": 200},
+    "createdAt": {"type": "string", "format": "date-time"},
+    "question": {"type": "string", "maxLength": 100000},
+    "excerpts": {"type": "array", "minItems": 1, "maxItems": 200, "items": {"$ref": "#/$defs/excerpt"}},
+    "memory": {"type": "array", "maxItems": 200, "items": {"$ref": "#/$defs/memory"}}
+  },
+  "$defs": {
+    "nullableString": {"type": ["string", "null"], "minLength": 1, "maxLength": 4096},
+    "hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "excerpt": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "label", "selectionOrder", "sourceLocalId", "sourceThreadId", "sourceTurnId", "sourceItemId", "sourceUri", "sourceKind", "role", "timestamp", "exactText", "sourceHash", "excerptHash", "sourceLength", "range"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1, "maxLength": 200},
+        "label": {"type": "string", "pattern": "^引用 [1-9][0-9]*$"},
+        "selectionOrder": {"type": "integer", "minimum": 1},
+        "sourceLocalId": {"type": "string", "minLength": 1, "maxLength": 200},
+        "sourceThreadId": {"$ref": "#/$defs/nullableString"},
+        "sourceTurnId": {"$ref": "#/$defs/nullableString"},
+        "sourceItemId": {"$ref": "#/$defs/nullableString"},
+        "sourceUri": {"$ref": "#/$defs/nullableString"},
+        "sourceKind": {"enum": ["imported-transcript", "app-server", "codex-rollout"]},
+        "role": {"enum": ["user", "assistant", "tool", "system", "developer", "unknown"]},
+        "timestamp": {"type": ["string", "null"], "format": "date-time"},
+        "exactText": {"type": "string", "minLength": 1, "maxLength": 1000000},
+        "sourceHash": {"$ref": "#/$defs/hash"},
+        "excerptHash": {"$ref": "#/$defs/hash"},
+        "sourceLength": {"type": "integer", "minimum": 1},
+        "range": {
+          "type": "object", "additionalProperties": false, "required": ["start", "end", "unit"],
+          "properties": {"start": {"type": "integer", "minimum": 0}, "end": {"type": "integer", "minimum": 1}, "unit": {"const": "utf16"}}
+        }
+      }
+    },
+    "memory": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "kind", "text", "sourceExcerptIds", "status", "version", "included"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1, "maxLength": 200},
+        "kind": {"enum": ["background", "constraint", "decision", "open-question"]},
+        "text": {"type": "string", "minLength": 1, "maxLength": 100000},
+        "sourceExcerptIds": {"type": "array", "minItems": 1, "maxItems": 200, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "status": {"enum": ["quoted", "user-confirmed", "model-proposed"]},
+        "version": {"type": "integer", "minimum": 1},
+        "included": {"type": "boolean"}
+      }
+    }
+  }
+}

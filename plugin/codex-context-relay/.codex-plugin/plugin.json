@@ -1,0 +1,19 @@
+{
+  "name": "codex-context-relay",
+  "version": "0.2.3",
+  "license": "MIT",
+  "description": "Carry exact quotes and confirmed context into the next question.",
+  "author": {
+    "name": "Local developer"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Codex Context Relay",
+    "shortDescription": "引用原文、确认背景、继续提问。",
+    "longDescription": "Import selected histories, preserve exact excerpts and source IDs, export ContextPacks, and transfer through a verified App Server. Companion selector; native message UI is not provided.",
+    "developerName": "Local developer",
+    "category": "Productivity",
+    "capabilities": ["Read", "Write"],
+    "defaultPrompt": "Help me use Codex Context Relay."
+  }
+}

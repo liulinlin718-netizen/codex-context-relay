@@ -1,0 +1,28 @@
+{
+  "title": "演示 fixture · 引用预算与方案讨论（非真实 Codex 会话）",
+  "sourceUri": "fixture://context-relay/demo-history",
+  "threadId": "fixture-demo-thread",
+  "messages": [
+    {
+      "id": "fixture-user-budget",
+      "turnId": "fixture-turn-1",
+      "role": "user",
+      "timestamp": "2026-09-17T09:00:00+08:00",
+      "text": "预算上限是每月 300 元。先做本地离线导出，不接入自动云同步。用户选中的原文必须保留，不能被摘要替换。"
+    },
+    {
+      "id": "fixture-assistant-proposal",
+      "turnId": "fixture-turn-1",
+      "role": "assistant",
+      "timestamp": "2026-09-17T09:01:00+08:00",
+      "text": "建议使用每月 499 元的托管检索服务，并开启整段历史自动同步。也可以先用 JSON 与 Markdown 引用包，等连接能力验证后再启用转发。"
+    },
+    {
+      "id": "fixture-unselected",
+      "turnId": "fixture-turn-2",
+      "role": "user",
+      "timestamp": "2026-09-17T09:02:00+08:00",
+      "text": "此消息用于检查最小化：UNSELECTED_PRIVATE_MARKER_731。这条未选消息不应出现在提问或导出包中。"
+    }
+  ]
+}

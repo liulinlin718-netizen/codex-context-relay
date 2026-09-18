@@ -1,0 +1,10 @@
+{
+  "name": "codex-context-relay",
+  "version": "0.2.3",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "Carry exact quotes and confirmed context into the next question.",
+  "engines": {"node": ">=22"},
+  "scripts": {"start": "node src/cli.mjs serve", "test": "node --test tests/*.test.mjs", "demo": "node scripts/demo.mjs", "mcp": "node src/mcp.mjs", "package": "node scripts/package.mjs"}
+}

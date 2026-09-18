@@ -1,0 +1,32 @@
+# 本项目过程文件与本地秘密
+.runtime/
+node_modules/
+dist/
+build/
+coverage/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.env
+.env.*
+!.env.example
+*.log
+playwright-report/
+test-results/
+.DS_Store
+output/
+.playwright-cli/
+
+# Local client setup, credentials and editor metadata
+.mcp.json
+.configure-plugin.lock
+*.pem
+*.key
+auth.json
+credentials.json
+.playwright/
+.vscode/
+.idea/
