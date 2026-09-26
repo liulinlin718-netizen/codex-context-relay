@@ -90,6 +90,81 @@ test('Codex response_item JSONL uses session and explicit turn metadata, never i
   assert.match(h.messages[0].localId, /^import-m/);
 });
 
+test('typed App Server provenance rejects conflicting aliases without mutating input or saved excerpts', () => {
+  const sourceUri = 'fixture://typed-thread';
+  const input = { thread: { id: 'canonical-thread', turns: [{ id: 'canonical-turn', items: [
+    { type: 'agentMessage', id: 'prior-item', text: 'Already parsed text' },
+    { type: 'userMessage', id: 'canonical-item', timestamp: '2026-09-25T01:00:00Z', content: [{ type: 'text', text: 'Budget is 300.' }] },
+  ] }] } };
+  const original = cloned(input);
+  const baseline = importHistory(input, { sourceUri });
+  const saved = createPack(baseline, [{ localId: baseline.messages[1].localId }]);
+  const snapshot = JSON.stringify(saved);
+  for (const [field, value] of Object.entries({ role: 'assistant', threadId: 'other-thread', turnId: 'other-turn', messageId: 'other-item', sourceUri: 'other-source', sourceKind: 'imported-transcript', createdAt: '2026-09-26T01:00:00Z' })) {
+    const bad = cloned(input); bad.thread.turns[0].items[1][field] = value;
+    const before = cloned(bad);
+    rejectsCode(() => importHistory(bad, { sourceUri }), 'HISTORY_PROVENANCE_CONFLICT');
+    assert.deepEqual(bad, before);
+    assert.equal(JSON.stringify(saved), snapshot);
+    delete bad.thread.turns[0].items[1][field];
+    assert.deepEqual(importHistory(bad, { sourceUri }), baseline, `correcting ${field} recovers the complete history`);
+  }
+  const compatible = cloned(input);
+  Object.assign(compatible.thread.turns[0].items[1], { role: 'user', threadId: 'canonical-thread', turnId: 'canonical-turn', messageId: 'canonical-item', sourceUri, sourceKind: 'app-server', createdAt: '2026-09-25T09:00:00+08:00' });
+  assert.deepEqual(importHistory(compatible, { sourceUri }), baseline);
+  assert.deepEqual(input, original);
+  assert.equal(checkSources(saved, baseline)[0].status, 'unchanged');
+});
+
+test('typed unknown source fields stay null and cannot be supplied by generic aliases', () => {
+  const input = { thread: { turns: [{ items: [{ type: 'userMessage', content: [{ type: 'text', text: 'Unknown origin.' }] }] }] } };
+  const baseline = importHistory(input);
+  for (const field of ['threadId', 'turnId', 'messageId', 'sourceUri']) {
+    assert.equal(baseline.messages[0][field], null);
+    const bad = cloned(input); bad.thread.turns[0].items[0][field] = 'invented';
+    rejectsCode(() => importHistory(bad), 'HISTORY_PROVENANCE_CONFLICT');
+    bad.thread.turns[0].items[0][field] = null;
+    assert.deepEqual(importHistory(bad), baseline);
+  }
+});
+
+test('rollout uses row and session provenance, rejects conflicting aliases and resets turns at a session boundary', () => {
+  const sourceUri = 'fixture://typed-rollout';
+  const rows = [
+    { type: 'session_meta', payload: { id: 'session-a' } },
+    { type: 'turn_context', payload: { turn_id: 'turn-a' } },
+    { type: 'response_item', timestamp: '2026-09-25T01:00:00Z', payload: { type: 'message', id: 'item-a', role: 'user', content: [{ type: 'input_text', text: 'Original user text.' }] } },
+  ];
+  const baseline = importHistory(rows, { sourceUri });
+  for (const [field, value] of Object.entries({ threadId: 'other-session', turnId: 'other-turn', messageId: 'other-item', sourceUri: 'other-source', sourceKind: 'app-server', timestamp: '2026-09-26T01:00:00Z', createdAt: '2026-09-26T01:00:00Z' })) {
+    const bad = cloned(rows); bad[2].payload[field] = value;
+    rejectsCode(() => importHistory(bad, { sourceUri }), 'HISTORY_PROVENANCE_CONFLICT');
+    delete bad[2].payload[field];
+    assert.deepEqual(importHistory(bad, { sourceUri }), baseline);
+  }
+  const compatible = cloned(rows);
+  Object.assign(compatible[2].payload, { threadId: 'session-a', turnId: 'turn-a', messageId: 'item-a', sourceUri, sourceKind: 'codex-rollout', timestamp: '2026-09-25T09:00:00+08:00' });
+  assert.deepEqual(importHistory(compatible, { sourceUri }), baseline);
+  rows.push({ type: 'session_meta', payload: { id: 'session-b' } }, { type: 'response_item', payload: { type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'New session without a turn ID.' }] } });
+  const next = importHistory(rows, { sourceUri }).messages[1];
+  assert.equal(next.threadId, 'session-b');
+  assert.equal(next.turnId, null);
+  assert.equal(next.messageId, null);
+  assert.equal(next.timestamp, null);
+});
+
+test('generic transcript aliases remain compatible and are not reinterpreted as typed provenance', () => {
+  const data = { threadId: 'collection', messages: [{ type: 'userMessage', id: 'fallback-id', messageId: 'explicit-id', role: 'assistant', threadId: 'explicit-thread', turnId: 'explicit-turn', sourceUri: 'explicit-source', sourceKind: 'codex-rollout', createdAt: 1780000000, text: 'Generic text.' }] };
+  const m = importHistory(data, { sourceUri: 'collection-file' }).messages[0];
+  assert.equal(m.role, 'assistant');
+  assert.equal(m.messageId, 'explicit-id');
+  assert.equal(m.threadId, 'explicit-thread');
+  assert.equal(m.turnId, 'explicit-turn');
+  assert.equal(m.sourceUri, 'explicit-source');
+  assert.equal(m.sourceKind, 'codex-rollout');
+  assert.equal(m.timestamp, new Date(1780000000 * 1000).toISOString());
+});
+
 test('App Server tool text uses schema fields and partial-history views are explicitly reported', () => {
   // Contract fixture derived from local CLI 0.154.0-alpha.6.2 ThreadReadResponse schema.
   const h = importHistory({ thread: { id: 'contract-thread', turns: [{ id: 'contract-turn', itemsView: 'summary', items: [

@@ -27,6 +27,28 @@ function timestamp(value) {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value) || Number.isNaN(Date.parse(value))) fail('INVALID_HISTORY', 'Source timestamp must be an ISO date-time');
   return value;
 }
+// Typed formats have their own source contract. Generic transcript aliases may
+// agree with that contract, but cannot replace it or fill in unknown host IDs.
+function typedProvenance(raw, context, sourceUri) {
+  const canonical = {
+    role: context.role ?? 'unknown',
+    threadId: nullable(context.threadId, 'threadId'),
+    turnId: nullable(context.turnId, 'turnId'),
+    messageId: nullable(raw.id, 'id'),
+    timestamp: timestamp(context.timestamp),
+    sourceUri,
+    sourceKind: context.sourceKind,
+  };
+  for (const field of ['role', 'threadId', 'turnId', 'messageId', 'sourceUri', 'sourceKind', 'timestamp', 'createdAt']) {
+    if (raw[field] == null) continue;
+    const isTime = field === 'timestamp' || field === 'createdAt';
+    const expected = canonical[isTime ? 'timestamp' : field];
+    const actual = isTime ? timestamp(raw[field]) : raw[field];
+    const matches = isTime && expected !== null ? Date.parse(actual) === Date.parse(expected) : actual === expected;
+    if (!matches) fail('HISTORY_PROVENANCE_CONFLICT', `${context.sourceKind} ${field} conflicts with the format's canonical source fields; correct the supplied document before importing`);
+  }
+  return canonical;
+}
 function contentText(item, warnings) {
   // Tool text fields follow the locally inspected App Server ThreadItem schema.
   if (item.type === 'mcpToolCall' && Array.isArray(item.result?.content)) return contentText({ content: item.result.content }, warnings);
@@ -67,7 +89,8 @@ export function importHistory(input, { sourceUri = null } = {}) {
   let messages = [];
   const add = (raw, context = {}) => {
     if (!object(raw)) fail('INVALID_HISTORY', 'Every message must be an object');
-    let role = raw.role ?? context.role ?? 'unknown';
+    const canonical = context.typed ? typedProvenance(raw, context, sourceUri) : null;
+    const role = canonical ? canonical.role : raw.role ?? context.role ?? 'unknown';
     if (!ROLES.has(role)) fail('INVALID_HISTORY', `Unsupported role: ${String(role)}`);
     const text = contentText(raw, warnings);
     if (text === null || text.length === 0) { warnings.push('A message without selectable text was skipped.'); return; }
@@ -76,11 +99,11 @@ export function importHistory(input, { sourceUri = null } = {}) {
     if (!KINDS.has(sourceKind)) fail('INVALID_HISTORY', 'Unsupported sourceKind');
     messages.push({
       localId: `import-m${String(messages.length + 1).padStart(6, '0')}`,
-      threadId: nullable(raw.threadId ?? context.threadId, 'threadId'),
-      turnId: nullable(raw.turnId ?? context.turnId, 'turnId'),
-      messageId: nullable(raw.messageId ?? raw.id, 'messageId'),
-      role, text, timestamp: timestamp(raw.timestamp ?? raw.createdAt ?? context.timestamp),
-      sourceUri: nullable(raw.sourceUri ?? sourceUri, 'sourceUri'), sourceKind,
+      threadId: canonical ? canonical.threadId : nullable(raw.threadId ?? context.threadId, 'threadId'),
+      turnId: canonical ? canonical.turnId : nullable(raw.turnId ?? context.turnId, 'turnId'),
+      messageId: canonical ? canonical.messageId : nullable(raw.messageId ?? raw.id, 'messageId'),
+      role, text, timestamp: canonical ? canonical.timestamp : timestamp(raw.timestamp ?? raw.createdAt ?? context.timestamp),
+      sourceUri: canonical ? canonical.sourceUri : nullable(raw.sourceUri ?? sourceUri, 'sourceUri'), sourceKind,
     });
   };
   // Official thread/read returns {thread:{id,turns:[{id,items:...}]}}.
@@ -95,7 +118,7 @@ export function importHistory(input, { sourceUri = null } = {}) {
         if (!object(item)) fail('INVALID_HISTORY', 'Every thread item must be an object');
         const role = item.type === 'userMessage' ? 'user' : item.type === 'agentMessage' ? 'assistant' : ['commandExecution', 'mcpToolCall', 'dynamicToolCall', 'functionCallOutput'].includes(item.type) ? 'tool' : null;
         if (!role) { warnings.push(`Unsupported App Server item type omitted: ${String(item.type)}`); continue; }
-        add(item, { role, threadId: thread.id, turnId: turn.id, sourceKind: 'app-server', timestamp: item.timestamp });
+        add(item, { typed: true, role, threadId: thread.id, turnId: turn.id, sourceKind: 'app-server', timestamp: item.timestamp });
       }
     }
   } else if (object(data) && Array.isArray(data.messages)) {
@@ -113,6 +136,7 @@ export function importHistory(input, { sourceUri = null } = {}) {
       if (row.type === 'session_meta') {
         if (!object(row.payload)) fail('INVALID_HISTORY', 'session_meta requires payload');
         threadId = nullable(row.payload.id, 'session_meta.id');
+        turnId = null;
         title = typeof row.payload.title === 'string' ? row.payload.title : 'Codex rollout';
         recognized = true;
       } else if (row.type === 'turn_context') {
@@ -121,7 +145,7 @@ export function importHistory(input, { sourceUri = null } = {}) {
       } else if (row.type === 'response_item') {
         recognized = true;
         if (!object(row.payload)) fail('INVALID_HISTORY', 'response_item requires payload');
-        if (row.payload.type === 'message') add(row.payload, { threadId, turnId, timestamp: row.timestamp, sourceKind: 'codex-rollout' });
+        if (row.payload.type === 'message') add(row.payload, { typed: true, role: row.payload.role, threadId, turnId, timestamp: row.timestamp, sourceKind: 'codex-rollout' });
       }
     }
     if (!recognized) fail('INVALID_HISTORY', 'Unrecognized history array; use {messages:[...]} for generic transcripts');

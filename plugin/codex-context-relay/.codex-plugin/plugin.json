@@ -1,6 +1,6 @@
 {
   "name": "codex-context-relay",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "license": "MIT",
   "description": "Carry exact quotes and confirmed context into the next question.",
   "author": {

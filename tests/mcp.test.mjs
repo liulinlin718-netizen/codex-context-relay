@@ -41,6 +41,23 @@ function startMcp(t) {
   return {request,raw,call,notify:(method,params={})=>proc.stdin.write(JSON.stringify({jsonrpc:'2.0',method,params})+'\n')};
 }
 
+test('MCP import-open returns its own real selector URL and bad imports leave it recoverable',async t=>{
+  const mcp=startMcp(t);
+  await mcp.request('initialize',{protocolVersion:'2025-03-26'});
+  const opened=await mcp.call('relay_import_open',{text:JSON.stringify({messages:[{role:'user',text:'Independent MCP draft A'}]}),port:6406});
+  assert.ok(!opened.isError,JSON.stringify(opened));
+  const value=opened.structuredContent;
+  assert.match(value.url,/^http:\/\/127\.0\.0\.1:6406\/\?draft=[\da-f-]+$/);
+  assert.notEqual(value.draftId,'main');
+  const origin=new URL(value.url).origin;
+  const {token}=await (await fetch(origin+'/bootstrap')).json();
+  const load=async()=> (await fetch(origin+'/api',{method:'POST',headers:{'content-type':'application/json','x-relay-token':token},body:JSON.stringify({action:'draft-load',data:{draftId:value.draftId}})})).json();
+  const draft=await load();assert.equal(draft.history.messages[0].text,'Independent MCP draft A');assert.ok(draft.historyId);
+  const bad=await mcp.call('relay_import_open',{text:'not json',port:6406});assert.equal(bad.isError,true);
+  assert.equal((await load()).revision,draft.revision);
+  const reopened=await mcp.call('relay_selector',{draftId:value.draftId,port:6406});assert.equal(reopened.structuredContent.url,value.url);
+});
+
 test('real MCP stdio initialize/import/pack/preview/export/readback works without host installation',async t=>{
   const mcp=startMcp(t);
   const initialization=await mcp.request('initialize',{protocolVersion:'2025-03-26',capabilities:{},clientInfo:{name:'context-relay-contract-test',version:'1'}});

@@ -1,0 +1,28 @@
+{
+  "thread": {
+    "id": "fixture-thread",
+    "name": "Synthetic full-message conformance fixture",
+    "turns": [
+      {
+        "id": "fixture-turn",
+        "items": [
+          {
+            "type": "userMessage",
+            "id": "fixture-user",
+            "content": [
+              {
+                "type": "text",
+                "text": "预算上限为每月 300 元。"
+              }
+            ]
+          },
+          {
+            "type": "agentMessage",
+            "id": "fixture-assistant",
+            "text": "建议先用离线导出，再评估同步。"
+          }
+        ]
+      }
+    ]
+  }
+}

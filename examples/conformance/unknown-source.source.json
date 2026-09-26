@@ -1,0 +1,9 @@
+{
+  "title": "Synthetic unknown-source conformance fixture",
+  "messages": [
+    {
+      "role": "assistant",
+      "text": "尚未确认：是否需要云同步？"
+    }
+  ]
+}

@@ -9,6 +9,8 @@ const version=JSON.parse(fs.readFileSync(new URL('../package.json',import.meta.u
 const definitions=[
  ['relay_capabilities','capabilities','Read integration boundaries and project storage paths.',{},[]],
  ['relay_import','import','Import only explicitly provided transcript JSON/JSONL or a ContextPack JSON/Markdown. Does not discover host history.',{text:string,sourceUri:{type:['string','null']}},['text']],
+ ['relay_import_open','import-open','Import user-supplied history, pack or full backup into a NEW independent draft and return its selector URL. Does not overwrite the default draft.',{text:string,sourceUri:{type:['string','null']},port:{type:'integer',minimum:6400,maximum:6409}},['text']],
+ ['relay_read_thread_open','thread-open','Read the explicit existing thread once, save a NEW independent draft and return its selector URL.',{threadId:string,port:{type:'integer',minimum:6400,maximum:6409}},['threadId']],
  ['relay_pack','pack','Select exact UTF-16 ranges from normalized history; preserves role, source and snapshot. No model rewriting.',{history:object,selections:{type:'array',items:{type:'object',properties:{localId:string,start:{type:'integer'},end:{type:'integer'}},required:['localId'],additionalProperties:false}},question:string,memory:{type:'array',items:object}},['history','selections']],
  ['relay_preview','preview','Return the complete outgoing text; includes only selected excerpts and included confirmed background.',{pack:object},['pack']],
  ['relay_export','export','Write JSON or Markdown to project-local exports, then read back and verify.',{pack:object,format:{enum:['json','md']}},['pack','format']],
@@ -19,12 +21,14 @@ const definitions=[
  ['relay_prepare','prepare','Prepare a durable receipt with exact preview and explicit existing target. Does not send.',{pack:object,targetThreadId:string},['pack','targetThreadId']],
  ['relay_send','send','Send the already reviewed receipt once to its existing target. Call only when the user requested this transfer. Unknown delivery must be reconciled, never automatically retried.',{receiptId:string},['receiptId']],
  ['relay_reconcile','reconcile','Read target turn state to recover an unknown/submitted receipt without resending.',{receiptId:string},['receiptId']],
+ ['relay_lock_diagnose','receipt-lock-diagnose','Inspect a receipt lock without sending or changing the receipt. Return owner evidence and recovery token when available.',{receiptId:string},['receiptId']],
+ ['relay_lock_recover','receipt-lock-recover','Explicitly recover only a provably inactive pre-send lock using the reviewed diagnostic token. Does NOT send; never recover attempted or unknown delivery.',{receiptId:string,expectedLockToken:string,confirm:{const:true}},['receiptId','expectedLockToken','confirm']],
  ['relay_receipts','receipts','Read durable transfer receipts, including failures and unknown delivery.',{},[]],
  ['relay_model','model','Run the explicitly configured real optional model backend. No configuration means an error, never a fixture answer.',{pack:object,operation:{enum:['answer','suggest']}},['pack']],
- ['relay_selector','selector','Open a local companion selector entrypoint on port 6400–6409. Returns URL, does not inject native message UI.',{port:{type:'integer',minimum:6400,maximum:6409}},[]],
+ ['relay_selector','selector','Open a local companion selector, optionally at a known draftId. For new material use relay_import_open or relay_read_thread_open.',{port:{type:'integer',minimum:6400,maximum:6409},draftId:string},[]],
 ];
-const mutations=new Set(['export','prepare','send','model','selector']);
-const tools=definitions.map(([name,action,description,properties,required])=>({name,description,inputSchema:{type:'object',properties,required,additionalProperties:false},annotations:{readOnlyHint:!mutations.has(action),destructiveHint:false,idempotentHint:action!=='model',openWorldHint:['send','model','bridge-probe','threads','thread-read','reconcile'].includes(action)}}));
+const mutations=new Set(['export','prepare','send','model','selector','import-open','thread-open','receipt-lock-recover']);
+const tools=definitions.map(([name,action,description,properties,required])=>({name,description,inputSchema:{type:'object',properties,required,additionalProperties:false},annotations:{readOnlyHint:!mutations.has(action),destructiveHint:false,idempotentHint:!['model','import-open','thread-open'].includes(action),openWorldHint:['send','model','bridge-probe','threads','thread-read','thread-open','reconcile'].includes(action)}}));
 let initialized=false,selector;
 const inFlight=new Map();
 function send(value){process.stdout.write(JSON.stringify(value)+'\n');}
@@ -54,7 +58,14 @@ async function receive(request){
       try {
         for(const field of def[4])if(!(field in args))throw new Error(`Missing ${field}`);
         let value;
-        if(def[1]==='selector'){selector??=await startServer({port:args.port||6400,quiet:true});value={url:selector.url,mode:'companion-local',nativeUI:false,fallback:'Copy to Codex is a manual fallback, not delivery.'};}
+        if(['selector','import-open','thread-open'].includes(def[1])){
+          if(args.port!==undefined&&(!Number.isInteger(args.port)||args.port<6400||args.port>6409))throw new Error('Port must be 6400–6409.');
+          if(selector&&args.port&&new URL(selector.url).port!==String(args.port))throw new Error('Selector already runs on a different port.');
+          let opened={};
+          if(def[1]!=='selector')opened=await dispatch(def[1],args,{signal:controller.signal});
+          else if(args.draftId){const existing=await dispatch('draft-load',{draftId:args.draftId});if(!existing.revision)throw Object.assign(new Error('Draft is missing; import it again.'),{code:'DRAFT_MISSING'});opened={draftId:existing.draftId,selectorPath:`/?draft=${existing.draftId}`};}
+          selector??=await startServer({port:args.port||6400,quiet:true});value={...opened,url:selector.url+(opened.selectorPath||''),mode:'companion-local',nativeUI:false,fallback:'Copy to Codex is a manual fallback, not delivery.'};
+        }
         else value=await dispatch(def[1],args,{signal:controller.signal});
         result={content:[{type:'text',text:JSON.stringify(value,null,2)}],structuredContent:typeof value==='object'&&!Array.isArray(value)?value:{value}};
       }catch(e){result={isError:true,content:[{type:'text',text:JSON.stringify({error:{code:e.code||'TOOL_FAILED',message:e.message}})}]};}

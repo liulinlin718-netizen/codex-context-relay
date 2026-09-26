@@ -1,0 +1,12 @@
+{
+  "title": "Synthetic partial-message conformance fixture",
+  "threadId": "fixture-partial-thread",
+  "messages": [
+    {
+      "id": "fixture-partial-item",
+      "role": "user",
+      "text": "未选前文。预算上限为每月 300 元，保留 😀。未选后文。",
+      "timestamp": "2026-09-25T00:00:00Z"
+    }
+  ]
+}

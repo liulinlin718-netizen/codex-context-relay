@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createDraftStore} from '../web/draft-store.js';
+import {createDraftStore,captureDraft,draftChanges} from '../web/draft-store.js';
 
 test('rapid edits keep snapshots immutable and never announce a stale save as current', async () => {
   const writes = [], states = [], resolvers = [];
@@ -22,6 +22,26 @@ test('rapid edits keep snapshots immutable and never announce a stale save as cu
   await store.flush();
   assert.equal(store.pending(), false);
   assert.equal(states.at(-1), 'saved');
+});
+
+test('question, background and order updates stay small while immutable excerpts survive queued edits',async()=>{
+  const excerpt={id:'a',exactText:'x'.repeat(1000000),selectionOrder:1};
+  const other={id:'b',exactText:'other',selectionOrder:2};
+  const pack={schemaVersion:'1',packId:'pack',createdAt:'now',question:'',excerpts:[excerpt,other],memory:[{id:'m',sourceExcerptIds:['a'],text:'background',status:'user-confirmed',included:true}]};
+  const first=captureDraft({historyId:'history-id',pack,question:'first',selectionCounter:2});
+  pack.question='second';
+  const second=captureDraft({historyId:'history-id',pack,question:'second',selectionCounter:2});
+  assert.strictEqual(first.pack.excerpts[0],second.pack.excerpts[0]);
+  assert.deepEqual(draftChanges(first,second),{question:'second'});
+  pack.memory[0].text='edited';pack.memory[0].sourceExcerptIds.push('b');
+  const third=captureDraft({historyId:'history-id',pack,excerptOrder:['b','a'],question:'second',selectionCounter:2});
+  assert.equal(first.pack.memory[0].text,'background');assert.deepEqual(first.pack.memory[0].sourceExcerptIds,['a']);
+  assert.equal(first.pack.excerpts[0].id,'a');
+  const patch=draftChanges(second,third);assert.deepEqual(patch.excerptOrder,['b','a']);assert.equal(patch.memory[0].text,'edited');
+  assert.ok(JSON.stringify(patch).length<1000);
+  pack.excerpts.push({id:'c',exactText:'new'});
+  assert.equal(draftChanges(third,captureDraft({historyId:'history-id',pack})),null);
+  assert.equal(draftChanges(third,captureDraft({historyId:'different',pack})),null);
 });
 
 test('a failed save remains dirty and retry writes the latest edit without clearing it', async () => {

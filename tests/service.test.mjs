@@ -88,6 +88,17 @@ test('complete backup restores private working history while export remains sele
   await assert.rejects(dispatch('import',{text:JSON.stringify({draftFormat:'context-relay-draft/v1',history:{messages:[{text:42}]}})}),{code:'INVALID_HISTORY'});
 });
 
+test('invalid backup display order is rejected before replacement through both import and direct validation',async()=>{
+  const {history,pack}=await prepare();
+  const duplicate=pack.excerpts.map(()=>pack.excerpts[0].id);
+  const draft={draftFormat:'context-relay-draft/v1',history,pack,excerptOrder:duplicate};
+  await assert.rejects(dispatch('draft-validate',draft),{code:'INVALID_EXCERPT_ORDER'});
+  await assert.rejects(dispatch('import',{text:JSON.stringify(draft)}),{code:'INVALID_EXCERPT_ORDER'});
+  const valid={...draft,excerptOrder:pack.excerpts.map(x=>x.id).reverse()};
+  assert.deepEqual((await dispatch('draft-validate',valid)).draft.excerptOrder,valid.excerptOrder);
+  assert.deepEqual((await dispatch('draft-validate',valid)).draft.pack.excerpts,pack.excerpts);
+});
+
 function request(port,requestPath,headers={},chunks=[]) {
   return new Promise((resolve,reject)=>{
     const req=http.request({host:'127.0.0.1',port,path:requestPath,method:chunks.length?'POST':'GET',headers,agent:false},res=>{

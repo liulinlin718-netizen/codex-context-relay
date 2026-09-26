@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "1",
+  "packId": "fixture-unknown-source",
+  "createdAt": "2026-09-25T00:00:00Z",
+  "excerpts": [
+    {
+      "id": "fixture-unknown-source-excerpt-1",
+      "label": "引用 1",
+      "selectionOrder": 1,
+      "sourceLocalId": "import-m000001",
+      "sourceThreadId": null,
+      "sourceTurnId": null,
+      "sourceItemId": null,
+      "sourceUri": null,
+      "sourceKind": "imported-transcript",
+      "role": "assistant",
+      "timestamp": null,
+      "exactText": "尚未确认：是否需要云同步？",
+      "sourceHash": "7d327673f88274370e1c3a2abbd25ecbcd48fda3afde1c306805309c1855996f",
+      "excerptHash": "7d327673f88274370e1c3a2abbd25ecbcd48fda3afde1c306805309c1855996f",
+      "sourceLength": 13,
+      "range": {
+        "start": 0,
+        "end": 13,
+        "unit": "utf16"
+      }
+    }
+  ],
+  "memory": [],
+  "question": "把这句话作为建议分析，不推断其原始任务。"
+}

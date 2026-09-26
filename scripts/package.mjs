@@ -6,14 +6,19 @@ import {ROOT, checkedPath, runtimePath, writeText} from '../src/paths.mjs';
 
 // Exact allowlist: new files must be reviewed before entering a distributable.
 export const releaseFiles = [
-  'package.json', 'README.md', 'DEMO.md', 'LICENSE',
+  'package.json', 'README.md', 'README.zh-CN.md','docs/images/context-pack.svg','docs/demo-result.json', 'DEMO.md', 'LICENSE',
   'src/cli.mjs', 'src/core.mjs', 'src/integrations.mjs', 'src/mcp.mjs',
-  'src/models.mjs', 'src/paths.mjs', 'src/server.mjs', 'src/service.mjs', 'src/drafts.mjs', 'src/connection-config.mjs',
+  'src/models.mjs', 'src/paths.mjs', 'src/server.mjs', 'src/service.mjs', 'src/drafts.mjs', 'src/history-store.mjs', 'src/connection-config.mjs',
   'web/app.js', 'web/draft-store.js', 'web/index.html', 'web/style.css',
   'schemas/context-pack.schema.json', 'schemas/model-output.schema.json',
   'examples/demo-history.json', 'docs/PROTOCOL.md', 'docs/MODELS.md', 'docs/INTEGRATION.md',
   'scripts/start.ps1', 'scripts/demo.mjs', 'scripts/probe-app-server.mjs',
   'scripts/probe-models.mjs', 'scripts/configure-plugin.mjs',
+  'scripts/generate-conformance-fixtures.mjs', 'examples/conformance/manifest.json',
+  'examples/conformance/full-message.source.json', 'examples/conformance/full-message.pack.json', 'examples/conformance/full-message.pack.md',
+  'examples/conformance/partial-message.source.json', 'examples/conformance/partial-message.pack.json', 'examples/conformance/partial-message.pack.md',
+  'examples/conformance/unknown-source.source.json', 'examples/conformance/unknown-source.pack.json', 'examples/conformance/unknown-source.pack.md',
+  'examples/conformance/rollout.source.jsonl', 'examples/conformance/rollout.pack.json', 'examples/conformance/rollout.pack.md',
 ];
 
 const version=JSON.parse(fs.readFileSync(path.join(ROOT,'package.json'),'utf8')).version;

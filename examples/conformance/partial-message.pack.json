@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "1",
+  "packId": "fixture-partial-message",
+  "createdAt": "2026-09-25T00:00:00Z",
+  "excerpts": [
+    {
+      "id": "fixture-partial-message-excerpt-1",
+      "label": "引用 1",
+      "selectionOrder": 1,
+      "sourceLocalId": "import-m000001",
+      "sourceThreadId": "fixture-partial-thread",
+      "sourceTurnId": null,
+      "sourceItemId": "fixture-partial-item",
+      "sourceUri": "fixture:conformance/partial-message",
+      "sourceKind": "imported-transcript",
+      "role": "user",
+      "timestamp": "2026-09-25T00:00:00Z",
+      "exactText": "预算上限为每月 300 元，保留 😀。",
+      "sourceHash": "bb8d6df8ff290701f7f9980eeae3d59a69ddb3ae08522baab633e4ab958d85e9",
+      "excerptHash": "40c3b9308b7c4ba30dea1705de2990d69109f7c594bf871cb570c897cf4f9dcf",
+      "sourceLength": 30,
+      "range": {
+        "start": 5,
+        "end": 25,
+        "unit": "utf16"
+      }
+    }
+  ],
+  "memory": [
+    {
+      "id": "fixture-partial-message-memory-1",
+      "version": 1,
+      "kind": "background",
+      "text": "尚未确认的模型提议：未来可能增加预算。",
+      "sourceExcerptIds": [
+        "fixture-partial-message-excerpt-1"
+      ],
+      "status": "model-proposed",
+      "included": false
+    }
+  ],
+  "question": "只解释选中的预算条件。"
+}

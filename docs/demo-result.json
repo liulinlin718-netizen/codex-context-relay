@@ -1,0 +1,17 @@
+{
+  "kind": "synthetic-producer-output",
+  "fixture": "examples/conformance/partial-message.pack.json",
+  "excerpt": {
+    "role": "user",
+    "exactText": "预算上限为每月 300 元，保留 😀。",
+    "range": {
+      "start": 5,
+      "end": 25,
+      "unit": "utf16"
+    },
+    "sourceHash": "bb8d6df8ff290701f7f9980eeae3d59a69ddb3ae08522baab633e4ab958d85e9",
+    "excerptHash": "40c3b9308b7c4ba30dea1705de2990d69109f7c594bf871cb570c897cf4f9dcf"
+  },
+  "unconfirmedMemoryIncluded": false,
+  "question": "只解释选中的预算条件。"
+}

@@ -1,0 +1,72 @@
+{
+  "fixtureFormat": "context-relay-conformance/v1",
+  "synthetic": true,
+  "description": "Synthetic protocol fixtures, not captured host conversations or model output. Receiver approval must remain a separate explicit action.",
+  "generatedBy": "node scripts/generate-conformance-fixtures.mjs",
+  "cases": [
+    {
+      "name": "full-message",
+      "source": "full-message.source.json",
+      "format": "json",
+      "sourceUri": "fixture:conformance/full-message",
+      "selections": [
+        {
+          "localId": "import-m000001"
+        },
+        {
+          "localId": "import-m000002"
+        }
+      ],
+      "pack": "full-message.pack.json",
+      "markdown": "full-message.pack.md",
+      "receiverApprovalRequired": true
+    },
+    {
+      "name": "partial-message",
+      "source": "partial-message.source.json",
+      "format": "json",
+      "sourceUri": "fixture:conformance/partial-message",
+      "selections": [
+        {
+          "localId": "import-m000001",
+          "start": 5,
+          "end": 25
+        }
+      ],
+      "pack": "partial-message.pack.json",
+      "markdown": "partial-message.pack.md",
+      "receiverApprovalRequired": true
+    },
+    {
+      "name": "unknown-source",
+      "source": "unknown-source.source.json",
+      "format": "json",
+      "sourceUri": null,
+      "selections": [
+        {
+          "localId": "import-m000001"
+        }
+      ],
+      "pack": "unknown-source.pack.json",
+      "markdown": "unknown-source.pack.md",
+      "receiverApprovalRequired": true
+    },
+    {
+      "name": "rollout",
+      "source": "rollout.source.jsonl",
+      "format": "jsonl",
+      "sourceUri": "fixture:conformance/rollout",
+      "selections": [
+        {
+          "localId": "import-m000001"
+        },
+        {
+          "localId": "import-m000002"
+        }
+      ],
+      "pack": "rollout.pack.json",
+      "markdown": "rollout.pack.md",
+      "receiverApprovalRequired": true
+    }
+  ]
+}

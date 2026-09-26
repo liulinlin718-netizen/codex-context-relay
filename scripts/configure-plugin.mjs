@@ -41,7 +41,7 @@ function checkRelease(){
     const bytes=fs.readFileSync(filename);
     if(bytes.length!==record.bytes||createHash('sha256').update(bytes).digest('hex')!==record.sha256)fail('RELEASE_INTEGRITY',`Release file differs from its manifest: ${record.path}. Restore or rebuild the release; setup did not overwrite local configuration.`);
   }
-  for(const required of ['package.json','.codex-plugin/plugin.json','src/mcp.mjs','src/cli.mjs','src/paths.mjs','src/core.mjs','src/service.mjs','src/server.mjs','src/integrations.mjs','src/models.mjs','src/drafts.mjs','src/connection-config.mjs','schemas/context-pack.schema.json','schemas/model-output.schema.json','web/index.html','web/app.js','web/draft-store.js','web/style.css','examples/demo-history.json','scripts/configure-plugin.mjs','skills/context-relay/SKILL.md'])if(!seen.has(required))fail('RELEASE_INCOMPLETE',`Release inventory omits ${required}. Re-extract the complete package.`);
+  for(const required of ['package.json','.codex-plugin/plugin.json','src/mcp.mjs','src/cli.mjs','src/paths.mjs','src/core.mjs','src/service.mjs','src/server.mjs','src/integrations.mjs','src/models.mjs','src/drafts.mjs','src/history-store.mjs','src/connection-config.mjs','schemas/context-pack.schema.json','schemas/model-output.schema.json','web/index.html','web/app.js','web/draft-store.js','web/style.css','examples/demo-history.json','scripts/configure-plugin.mjs','skills/context-relay/SKILL.md'])if(!seen.has(required))fail('RELEASE_INCOMPLETE',`Release inventory omits ${required}. Re-extract the complete package.`);
   return identity;
 }
 function configEntry(config){

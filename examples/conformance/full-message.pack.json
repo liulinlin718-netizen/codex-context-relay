@@ -1,0 +1,76 @@
+{
+  "schemaVersion": "1",
+  "packId": "fixture-full-message",
+  "createdAt": "2026-09-25T00:00:00Z",
+  "excerpts": [
+    {
+      "id": "fixture-full-message-excerpt-1",
+      "label": "引用 1",
+      "selectionOrder": 1,
+      "sourceLocalId": "import-m000001",
+      "sourceThreadId": "fixture-thread",
+      "sourceTurnId": "fixture-turn",
+      "sourceItemId": "fixture-user",
+      "sourceUri": "fixture:conformance/full-message",
+      "sourceKind": "app-server",
+      "role": "user",
+      "timestamp": null,
+      "exactText": "预算上限为每月 300 元。",
+      "sourceHash": "6ff823bd7d0cffc714122d3d56c2d00ce393d16e7579896ef1612e69e143aa41",
+      "excerptHash": "6ff823bd7d0cffc714122d3d56c2d00ce393d16e7579896ef1612e69e143aa41",
+      "sourceLength": 14,
+      "range": {
+        "start": 0,
+        "end": 14,
+        "unit": "utf16"
+      }
+    },
+    {
+      "id": "fixture-full-message-excerpt-2",
+      "label": "引用 2",
+      "selectionOrder": 2,
+      "sourceLocalId": "import-m000002",
+      "sourceThreadId": "fixture-thread",
+      "sourceTurnId": "fixture-turn",
+      "sourceItemId": "fixture-assistant",
+      "sourceUri": "fixture:conformance/full-message",
+      "sourceKind": "app-server",
+      "role": "assistant",
+      "timestamp": null,
+      "exactText": "建议先用离线导出，再评估同步。",
+      "sourceHash": "c3fff84128e875385caa259085e21d3eeb0e8174cf22ddf7a8b6319a89e24409",
+      "excerptHash": "c3fff84128e875385caa259085e21d3eeb0e8174cf22ddf7a8b6319a89e24409",
+      "sourceLength": 15,
+      "range": {
+        "start": 0,
+        "end": 15,
+        "unit": "utf16"
+      }
+    }
+  ],
+  "memory": [
+    {
+      "id": "fixture-full-message-memory-1",
+      "version": 1,
+      "kind": "constraint",
+      "text": "预算上限为每月 300 元。",
+      "sourceExcerptIds": [
+        "fixture-full-message-excerpt-1"
+      ],
+      "status": "quoted",
+      "included": true
+    },
+    {
+      "id": "fixture-full-message-memory-2",
+      "version": 1,
+      "kind": "decision",
+      "text": "本夹具模拟发送者确认：先做离线导出。",
+      "sourceExcerptIds": [
+        "fixture-full-message-excerpt-2"
+      ],
+      "status": "user-confirmed",
+      "included": true
+    }
+  ],
+  "question": "引用 2 是否满足引用 1？"
+}

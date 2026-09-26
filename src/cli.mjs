@@ -14,6 +14,15 @@ try {
   switch(command){
     case 'connection': {const options=parseConnectionArgs(args);if(options.help)process.stdout.write(connectionHelp);else {const result=await configureConnection(options);json(result);if(!result.verification.verified)process.exitCode=1;}break;}
     case 'serve': {const p=args.indexOf('--port');const app=await startServer({port:p<0?6400:Number(args[p+1])});process.on('SIGINT',async()=>{await app.close();process.exit(0)});process.on('SIGTERM',async()=>{await app.close();process.exit(0)});break;}
+    case 'open':
+    case 'open-thread': {
+      const p=args.indexOf('--port'),port=p<0?6400:Number(args[p+1]);
+      if(!Number.isInteger(port)||port<6400||port>6409)throw new Error('Port must be 6400–6409.');
+      if(!args[0]||args[0].startsWith('--'))throw new Error(command==='open'?'Specify an explicit history, pack or backup file.':'Specify an existing thread ID.');
+      const opened=await dispatch(command==='open'?'import-open':'thread-open',command==='open'?{text:fs.readFileSync(args[0],'utf8'),sourceUri:path.resolve(args[0])}:{threadId:args[0]});
+      const app=await startServer({port,quiet:true});json({...opened,url:app.url+opened.selectorPath});
+      process.on('SIGINT',async()=>{await app.close();process.exit(0)});process.on('SIGTERM',async()=>{await app.close();process.exit(0)});break;
+    }
     case 'doctor': json({storage:storageReport(),capabilities:await dispatch('capabilities'),bridge:await dispatch('bridge-probe')});await closeBridge();break;
     case 'import': json(await dispatch('import',{text:fs.readFileSync(args[0],'utf8'),sourceUri:path.resolve(args[0])}));break;
     case 'preview': {const r=await dispatch('preview',{pack:await readPack(args[0])});process.stdout.write(r.prompt+'\n');break;}
@@ -21,6 +30,8 @@ try {
     case 'prepare': json(await dispatch('prepare',{pack:await readPack(args[0]),targetThreadId:args[1]}));await closeBridge();break;
     case 'send': json(await dispatch('send',{receiptId:args[0]}));await closeBridge();break;
     case 'reconcile': json(await dispatch('reconcile',{receiptId:args[0]}));await closeBridge();break;
+    case 'lock-diagnose': json(await dispatch('receipt-lock-diagnose',{receiptId:args[0]}));await closeBridge();break;
+    case 'lock-recover': {if(args[2]!=='--confirm')throw new Error('Review lock-diagnose first; use lock-recover <receipt-id> <lock-token> --confirm. This does not send.');json(await dispatch('receipt-lock-recover',{receiptId:args[0],expectedLockToken:args[1],confirm:true}));await closeBridge();break;}
     case 'receipts': json(await dispatch('receipts'));await closeBridge();break;
     case 'model': json(await dispatch('model',{pack:await readPack(args[0]),operation:args[1]||'answer'}));break;
     case 'login': {
@@ -29,6 +40,6 @@ try {
       const proc=spawn(cli,loginInstructions(cli).args,{cwd:ROOT,env:modelChildEnv(),shell:false,stdio:'inherit',windowsHide:true});
       proc.on('error',e=>{process.stderr.write(`${e.code}: Codex CLI unavailable.\n`);process.exitCode=1;});proc.on('exit',code=>{process.exitCode=code??1;});break;
     }
-    default: process.stdout.write('Context Relay 0.2\nserve [--port 6400] | doctor | import <history> | preview <pack> | export <pack> [json|md]\nprepare <pack> <existing-thread-id> | send <receipt-id> | reconcile <receipt-id> | receipts\nmodel <pack> [answer|suggest] | login | connection --help\nRequires Node.js 22+. Data stays under this copy of the project in .runtime/.\n');
+    default: process.stdout.write('Context Relay 0.2\nserve [--port 6400] | open <history|pack|backup> [--port 6400] | open-thread <existing-id> [--port 6400]\ndoctor | import <history> | preview <pack> | export <pack> [json|md]\nprepare <pack> <existing-thread-id> | send <receipt-id> | reconcile <receipt-id> | receipts\nlock-diagnose <receipt-id> | lock-recover <receipt-id> <lock-token> --confirm\nmodel <pack> [answer|suggest] | login | connection --help\nRequires Node.js 22+. Data stays under this copy of the project in .runtime/.\n');
   }
 }catch(e){json({error:{code:e.code||'FAILED',message:e.message},...(e.code==='CONNECTION_NOT_VERIFIED'&&e.verification?{verification:e.verification}:{})});await closeBridge().catch(()=>{});process.exitCode=1;}

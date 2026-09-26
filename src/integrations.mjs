@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import net from 'node:net';
+import os from 'node:os';
 import {spawn} from 'node:child_process';
 import {EventEmitter} from 'node:events';
 import {ROOT, checkedPath, runtimePath, childEnv} from './paths.mjs';
@@ -109,6 +111,71 @@ function writeReceipt(filename,record,{exclusive=false}={}) {
   let fd;try {fd=fs.openSync(temp,'wx');fs.writeFileSync(fd,JSON.stringify(record,null,2));fs.fsyncSync(fd);}finally{if(fd!==undefined)fs.closeSync(fd);}
   fs.renameSync(temp,filename);
 }
+
+// A file's age or PID cannot prove ownership has expired. These local kernel
+// endpoints remain exclusively bound throughout send/recovery and disappear
+// when their process exits. Linux's abstract socket has no stale pathname.
+// Capture the scope once: a host rename must not change an active owner's key.
+// Abstract sockets are network-namespace scoped on Linux, so shared files from
+// a different namespace must not be mistaken for an exited local owner.
+const lockScope=(()=>{
+  if(process.platform==='win32')return ['win32',os.hostname()];
+  if(process.platform==='linux'){
+    try{return ['linux',os.hostname(),fs.readlinkSync('/proc/self/ns/net')];}catch{return null;}
+  }
+  return null;
+})();
+const supportsLockGuard=lockScope!==null;
+const lockOwnerToken=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+function lockGuardKey(filename) {
+  const canonical=process.platform==='win32'?filename.toLowerCase():filename;
+  return hash(JSON.stringify([lockScope,canonical]));
+}
+
+function publicationTwin(filename) {
+  // This is the only permitted two-link state: our exact, complete publication
+  // staging file and its authoritative lock, in the same checked directory.
+  // Never follow a link, trust a path from JSON, or allow an additional alias.
+  try {
+    const stat=fs.lstatSync(filename);
+    if(!stat.isFile() || stat.isSymbolicLink() || stat.nlink!==2 || stat.size>4096)return null;
+    const record=JSON.parse(fs.readFileSync(filename,'utf8'));
+    if(record?.schemaVersion!==2 || record.protocol!=='kernel-guard-v1' || record.guardKey!==lockGuardKey(filename) || typeof record.ownerToken!=='string' || !lockOwnerToken.test(record.ownerToken))return null;
+    const staging=`${filename}.${record.ownerToken}.tmp`,other=fs.lstatSync(staging);
+    if(!other.isFile() || other.isSymbolicLink() || other.nlink!==2 || other.dev!==stat.dev || other.ino!==stat.ino || !stat.ino)return null;
+    return staging;
+  }catch{return null;}
+}
+async function acquireLockGuard(filename) {
+  if(!supportsLockGuard)return {supported:false,release:async()=>{}};
+  const key=lockGuardKey(filename);
+  const address=process.platform==='win32'?`\\\\.\\pipe\\context-relay-lock-${key}`:`\0context-relay-lock-${key}`;
+  const server=net.createServer(socket=>socket.destroy());
+  await new Promise((resolve,reject)=>{
+    server.once('error',e=>reject(error(e.code==='EADDRINUSE'?'RECEIPT_LOCKED':'LOCK_GUARD_UNAVAILABLE',e.code==='EADDRINUSE'?'回执仍有活跃操作；不能恢复或重复发送。':'无法取得本机排他锁证明；保留锁，不自动发送。')));
+    server.listen({path:address,exclusive:true},resolve);
+  });
+  server.unref();
+  let released=false;
+  return {supported:true,release:async()=>{
+    if(released)return;released=true;
+    await new Promise(resolve=>server.close(resolve));
+  }};
+}
+
+function publishReceiptLock(filename,record) {
+  // Publish only a complete, durable record. A crash while writing the staging
+  // file leaves no malformed authoritative lock and never records send intent.
+  const temp=checkedPath(`${filename}.${record.ownerToken}.tmp`);
+  let fd;
+  try {
+    fd=fs.openSync(temp,'wx');fs.writeFileSync(fd,JSON.stringify(record));fs.fsyncSync(fd);fs.closeSync(fd);fd=undefined;
+    fs.linkSync(temp,filename); // Atomic create-if-absent; never replace a lock.
+  } finally {
+    if(fd!==undefined)fs.closeSync(fd);
+    try{fs.unlinkSync(temp);}catch(e){if(e.code!=='ENOENT')throw e;}
+  }
+}
 function busy(thread) {return thread?.status?.type==='active' || thread?.turns?.some(turn=>turn.status==='inProgress');}
 function assertIdle(thread) {
   if(busy(thread))throw error('TARGET_BUSY','目标 task 正在运行。请等当前回合结束后再发送；不会主动 steer。');
@@ -152,7 +219,96 @@ export function createBridge(config={}) {
     if(persisted.deliveryAttempted && ['completed','failed'].includes(persisted.status))return structuredClone(persisted);
     Object.assign(r,persisted,changes,{updatedAt:now()});writeReceipt(receiptFile(r.id),r);return structuredClone(r);
   };
-  const lock=id=>{const filename=checkedPath(path.join(receiptDir,id+'.lock'));let fd;try{fd=fs.openSync(filename,'wx');fs.writeFileSync(fd,JSON.stringify({pid:process.pid,createdAt:now()}));fs.fsyncSync(fd);fs.closeSync(fd);}catch(e){if(fd!==undefined)try{fs.closeSync(fd);}catch{}if(e.code==='EEXIST')throw error('RECEIPT_LOCKED','回执正在处理或上次进程中断；先执行只读核对，不自动重发。');throw e;}return ()=>{try{fs.unlinkSync(filename);}catch{}};};
+  const lockFile=id=>{
+    receiptFile(id);const filename=path.join(checkedPath(receiptDir),id+'.lock');
+    try{return checkedPath(filename);}catch(e){
+      if(e.code!=='REPARSE_PATH')throw e;
+      // Permit inspection of this one crash state, not general hardlink I/O.
+      // diagnose/send do not remove it; explicit recovery checks it again while
+      // holding the kernel guard before deleting only the derived staging twin.
+      if(publicationTwin(filename))return filename;
+      return checkedPath(filename); // The publisher may just have removed its twin.
+    }
+  };
+  const lockSnapshot=filename=>{
+    let raw;
+    try{raw=fs.readFileSync(filename,'utf8');}catch(e){if(e.code==='ENOENT')return null;throw e;}
+    let record=null;try{record=JSON.parse(raw);}catch{}
+    return {token:hash(raw),record};
+  };
+  const lock=async id=>{
+    const filename=lockFile(id),guard=await acquireLockGuard(filename);
+    const record={schemaVersion:2,protocol:guard.supported?'kernel-guard-v1':'file-exclusive-v1',guardKey:lockGuardKey(filename),ownerToken:crypto.randomUUID(),pid:process.pid,createdAt:now()};
+    let snapshot;
+    try {
+      publishReceiptLock(filename,record);snapshot=lockSnapshot(filename);
+    } catch(e) {
+      await guard.release();
+      if(e.code==='EEXIST')throw error('RECEIPT_LOCKED','存在遗留或正在处理的回执锁；请先诊断锁。已尝试发送的回执仅可只读核对，不自动重发。');
+      throw e;
+    }
+    return async()=>{
+      try {
+        // Never unlink another generation, even if an external tool changed it.
+        if(lockSnapshot(filename)?.token===snapshot.token)fs.unlinkSync(filename);
+      } finally {await guard.release();}
+    };
+  };
+  const recoveryReceipt=id=>{
+    const r=receipt(id);
+    if(r.id!==id)throw error('RECEIPT_CORRUPT','回执内容与文件标识不一致；保留锁，不能恢复。');
+    if(r.connectionId!==identity)throw error('CONNECTION_MISMATCH','请使用回执原连接诊断或恢复锁。');
+    return r;
+  };
+  function lockDiagnosis(r,filename,snapshot,ownerState,guardAvailable) {
+    const record=snapshot?.record;
+    const recognized=record?.schemaVersion===2 && record.protocol==='kernel-guard-v1' && record.guardKey===lockGuardKey(filename) && typeof record.ownerToken==='string' && lockOwnerToken.test(record.ownerToken);
+    if(ownerState!=='active')ownerState=!snapshot?'none':guardAvailable&&recognized?'inactive':'unverifiable';
+    const result={receiptId:r.id,status:r.status,deliveryAttempted:r.deliveryAttempted,locked:!!snapshot||ownerState==='active',ownerState,lockToken:snapshot?.token || null,recoverable:false};
+    const explain=(code,reason)=>({...result,code,reason});
+    // Unknown intent is never converted to a retryable prepared receipt.
+    if(r.deliveryAttempted!==false || !['prepared','failed'].includes(r.status) || r.submittedAt || r.turnId || r.delivered)
+      return explain('DELIVERY_REQUIRES_RECONCILE','回执已尝试发送或发送意图不明确；只读核对目标历史，不能恢复后重发。');
+    if(ownerState==='active')return explain('LOCK_OWNER_ACTIVE','本机内核锁仍由活跃操作持有；不能按时间或 PID 夺锁。');
+    if(!snapshot)return explain('NO_LOCK','没有遗留锁；本操作未发送正文。');
+    if(!guardAvailable)return explain('LOCK_OWNER_UNVERIFIABLE','当前平台或权限无法核验内核锁所有者；保留锁和回执，不自动发送。');
+    if(!recognized)
+      return {...explain('LOCK_OWNER_UNVERIFIABLE','旧版、损坏或不同本机命名空间的锁缺少可证明的所有者信息；不会自动删除。请保留回执和锁，停止原发送进程并由维护人员核验，或导出引用包；不要通过改正文绕过去重。'),ownerState:'unverifiable'};
+    try {
+      validatePack(r.pack);
+      if(r.id!==hash(identity+'\n'+r.targetThreadId+'\n'+renderPrompt(r.pack)) || r.preview!==`${renderPrompt(r.pack)}\n\n[Context Relay Receipt: ${r.id}]` || hash(r.preview)!==r.bodyHash)throw new Error('Receipt mismatch');
+    } catch {return explain('RECEIPT_CORRUPT','回执原文、标识或哈希不一致；保留锁，先检查原回执，不允许恢复后发送。');}
+    return {...explain('LOCK_OWNER_INACTIVE','已在本机取得同一排他内核锁，确认原操作不再持有它；回执未记录发送意图。可明确请求释放遗留锁，再单独确认发送。'),ownerState:'inactive',recoverable:true};
+  }
+  async function diagnoseReceiptLock(id) {
+    recoveryReceipt(id);const filename=lockFile(id);
+    let guard;
+    try {guard=await acquireLockGuard(filename);}
+    catch(e) {
+      if(!['RECEIPT_LOCKED','LOCK_GUARD_UNAVAILABLE'].includes(e.code))throw e;
+      return lockDiagnosis(recoveryReceipt(id),filename,lockSnapshot(filename),e.code==='RECEIPT_LOCKED'?'active':'unverifiable',false);
+    }
+    try {const snapshot=lockSnapshot(filename);return lockDiagnosis(recoveryReceipt(id),filename,snapshot,snapshot?'unverifiable':'none',guard.supported);}
+    finally {await guard.release();}
+  }
+  async function recoverReceiptLock(id,{expectedLockToken,confirm=false}={}) {
+    if(confirm!==true)throw error('RECOVERY_CONFIRM_REQUIRED','必须明确确认释放遗留锁；恢复不会发送正文。');
+    if(typeof expectedLockToken!=='string' || !/^[a-f0-9]{64}$/.test(expectedLockToken))throw error('LOCK_TOKEN_REQUIRED','请先诊断并提供当时的 lockToken；不允许盲目恢复。');
+    recoveryReceipt(id);const filename=lockFile(id),guard=await acquireLockGuard(filename);
+    try {
+      const snapshot=lockSnapshot(filename);
+      if(snapshot?.token!==expectedLockToken)throw error('LOCK_CHANGED','锁已消失或发生变化；请重新诊断。未发送正文。');
+      const r=recoveryReceipt(id),diagnosis=lockDiagnosis(r,filename,snapshot,'unverifiable',guard.supported);
+      if(!diagnosis.recoverable)throw error(diagnosis.code,diagnosis.reason);
+      // All cooperating senders/recoverers hold this guard. An exited owner
+      // cannot unlock later, and a new sender cannot enter before this unlink.
+      const twin=publicationTwin(filename);
+      if(twin)fs.unlinkSync(twin);
+      checkedPath(filename); // No other hardlink/reparse exception is allowed.
+      fs.unlinkSync(filename);
+      return {receiptId:id,recovered:true,lockToken:expectedLockToken,status:r.status,deliveryAttempted:false,note:'遗留锁已释放；回执、预览和正文哈希未修改。尚未发送，请另行明确确认发送。'};
+    } finally {await guard.release();}
+  }
   async function connect() {
     if(requested==='export-only')throw error('EXPORT_ONLY','未配置宿主连接；使用 Markdown/JSON 导出或复制到 Codex 提问。');
     if(transport && !transport.closed)return transport;
@@ -300,7 +456,7 @@ export function createBridge(config={}) {
     });
   }
   async function send(id) {
-    let r=receipt(id);const unlock=lock(id);
+    let r=receipt(id);const unlock=await lock(id);
     try {
       r=receipt(id);
       if(r.connectionId!==identity)throw error('CONNECTION_MISMATCH','回执属于另一连接，不能发送。');
@@ -325,7 +481,7 @@ export function createBridge(config={}) {
         if(terminal.has(response.turn.status))return applyTurn(r,response.turn);
         return await waitForTurn(r,t);
       }catch(e){return save(r,{status:r.deliveryAttempted?'unknown':'failed',error:publicError(e),note:r.deliveryAttempted?'交付未知；不得自动重发。':'发送前检查失败，未发送正文。修正后可以明确再次发送。'});}
-    } finally {unlock();}
+    } finally {await unlock();}
   }
   async function reconcile(id) {
     const r=receipt(id);
@@ -338,5 +494,5 @@ export function createBridge(config={}) {
       return save(r,{status:'unknown',note:matches.length>1?'发现多个匹配回合，需要人工核对；不重发。':'当前只读历史无法确认是否送达；可能尚未持久化或历史未完整返回。不重发。'});
     }catch(e){return save(r,{status:'unknown',error:publicError(e),note:'目标暂时不可达；引用包和草稿仍在。恢复连接后只读核对。'});}
   }
-  return {probe,list,read,prepare,send,reconcile,receipt,receipts:()=>fs.readdirSync(receiptDir).filter(name=>/^[a-f0-9]{64}\.json$/.test(name)).map(name=>receipt(name.slice(0,-5))),close:async()=>{transport?.close();transport=null;},capabilities:()=>structuredClone(capability)};
+  return {probe,list,read,prepare,send,reconcile,diagnoseReceiptLock,recoverReceiptLock,receipt,receipts:()=>fs.readdirSync(receiptDir).filter(name=>/^[a-f0-9]{64}\.json$/.test(name)).map(name=>receipt(name.slice(0,-5))),close:async()=>{transport?.close();transport=null;},capabilities:()=>structuredClone(capability)};
 }

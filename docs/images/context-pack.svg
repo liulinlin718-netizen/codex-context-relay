@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="450" viewBox="0 0 960 450" role="img" aria-labelledby="title desc">
+<title id="title">Context Relay · Select a passage, keep its provenance</title><desc id="desc">A real exported ContextPack keeps the exact quote separate from proposed background.</desc>
+<rect width="960" height="100%" rx="20" fill="#f6f8fb"/>
+<style>text{font-family:Segoe UI,Arial,sans-serif;fill:#183046}.mono{font-family:Consolas,monospace}.muted{fill:#5c6f82}.ok{fill:#12754d}.bad{fill:#b23437}.warn{fill:#986114}</style>
+<text x="32" y="44" font-size="26" class="" font-weight="700">Context Relay · Select a passage, keep its provenance</text>
+<text x="32" y="73" font-size="14" class="muted" font-weight="400">A real exported ContextPack keeps the exact quote separate from proposed background.</text>
+<rect x="32" y="100" width="424" height="242" rx="12" fill="#fff" stroke="#d7e0e8"/>
+<rect x="484" y="100" width="444" height="242" rx="12" fill="#fff" stroke="#d7e0e8"/>
+<text x="52" y="134" font-size="13" class="muted" font-weight="700">SELECTED PASSAGE</text>
+<text x="52" y="176" font-size="20" class="" font-weight="700">预算上限为每月 300 元，保留 😀。</text>
+<text x="52" y="212" font-size="16" class="" font-weight="400">Role: user</text>
+<text x="52" y="243" font-size="16" class="" font-weight="400">UTF-16 range: 5–25</text>
+<text x="52" y="283" font-size="14" class="muted" font-weight="400">Surrounding paragraphs are not selected.</text>
+<text x="504" y="134" font-size="13" class="muted" font-weight="700">PORTABLE CONTEXTPACK</text>
+<text x="504" y="176" font-size="19" class="" font-weight="700">Exact excerpt + source references</text>
+<text x="504" y="216" font-size="14" class="mono" font-weight="400">Whole-message hash: bb8d6df8ff290701…</text>
+<text x="504" y="246" font-size="14" class="mono" font-weight="400">Excerpt hash: 40c3b9308b7c4ba3…</text>
+<text x="504" y="285" font-size="16" class="ok" font-weight="700">Unconfirmed model memory: excluded</text>
+<rect x="32" y="362" width="896" height="40" rx="12" fill="#eaf2ff" stroke="#d7e0e8"/>
+<text x="50" y="388" font-size="17" class="" font-weight="400">Next question: 只解释选中的预算条件。</text>
+<text x="32" y="428" font-size="12" class="muted" font-weight="400">Actual saved output, visualized · Synthetic example · No model call</text>
+</svg>

@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "1",
+  "packId": "fixture-rollout",
+  "createdAt": "2026-09-25T00:00:00Z",
+  "excerpts": [
+    {
+      "id": "fixture-rollout-excerpt-1",
+      "label": "引用 1",
+      "selectionOrder": 1,
+      "sourceLocalId": "import-m000001",
+      "sourceThreadId": "fixture-rollout-session",
+      "sourceTurnId": "fixture-rollout-turn",
+      "sourceItemId": null,
+      "sourceUri": "fixture:conformance/rollout",
+      "sourceKind": "codex-rollout",
+      "role": "user",
+      "timestamp": "2026-09-25T00:00:00Z",
+      "exactText": "先离线验证来源，再考虑转发。",
+      "sourceHash": "03b183f9a83911a2424b7012c936699fe07727c1ed14e1a8514dcb0e085f99a3",
+      "excerptHash": "03b183f9a83911a2424b7012c936699fe07727c1ed14e1a8514dcb0e085f99a3",
+      "sourceLength": 14,
+      "range": {
+        "start": 0,
+        "end": 14,
+        "unit": "utf16"
+      }
+    },
+    {
+      "id": "fixture-rollout-excerpt-2",
+      "label": "引用 2",
+      "selectionOrder": 2,
+      "sourceLocalId": "import-m000002",
+      "sourceThreadId": "fixture-rollout-session",
+      "sourceTurnId": "fixture-rollout-turn",
+      "sourceItemId": null,
+      "sourceUri": "fixture:conformance/rollout",
+      "sourceKind": "codex-rollout",
+      "role": "assistant",
+      "timestamp": "2026-09-25T00:00:01Z",
+      "exactText": "可以先生成可核对的引用包。",
+      "sourceHash": "a6efde4f38a82da22ba02512f96f67f3af8026f79f339cfa8d8256ab26aefc26",
+      "excerptHash": "a6efde4f38a82da22ba02512f96f67f3af8026f79f339cfa8d8256ab26aefc26",
+      "sourceLength": 13,
+      "range": {
+        "start": 0,
+        "end": 13,
+        "unit": "utf16"
+      }
+    }
+  ],
+  "memory": [
+    {
+      "id": "fixture-rollout-memory-1",
+      "version": 1,
+      "kind": "decision",
+      "text": "本夹具模拟已确认但本次不发送的背景。",
+      "sourceExcerptIds": [
+        "fixture-rollout-excerpt-1"
+      ],
+      "status": "user-confirmed",
+      "included": false
+    }
+  ],
+  "question": "结合两条引用说明下一步。"
+}
